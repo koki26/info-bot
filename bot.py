@@ -8,23 +8,16 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import datetime
-from dotenv import load_dotenv
 import os
 import threading
 from flask import Flask
 
 # =========================
-# ENV
+# KONSTANTY
 # =========================
-load_dotenv()
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-GUILD_ID = int(os.getenv("GUILD_ID"))
-PORT = int(os.environ.get("PORT", 10000))  # Render PORT
-
-# ---------------------------------------
-# KONFIGURACE
-# ---------------------------------------
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+GUILD_ID = int(os.environ.get("GUILD_ID"))
+PORT = int(os.environ.get("PORT", 10000))
 
 # Info kanály
 CATEGORY_NAME = "📅 Info"
@@ -35,7 +28,7 @@ ADDER_ROLE_ID = 1415779903219175475   # ID role "Whitelist Adder"
 RESULTS_CHANNEL_ID = 1415779774286008451  # ID kanálu #wl-vysledky
 
 # =========================
-# FLASK WEB SERVER (pro Render)
+# FLASK WEB SERVER (pro Render keep-alive)
 # =========================
 app = Flask(__name__)
 
@@ -44,18 +37,11 @@ def home():
     return "✅ Discord bot is running."
 
 def run_web():
-    app.run(host="0.0.0.0", port=PORT)
+    app.run(host="0.0.0.0", port=PORT, debug=False)
 
 # =========================
 # DISCORD BOT
 # =========================
-intents = discord.Intents.default()
-intents.members = True
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-@bot.event
-async def on_ready():
-    print(f"🤖 Bot přihlášen jako {bot.user}")
 
 # České názvy dní
 CZECH_DAYS = [
@@ -63,11 +49,9 @@ CZECH_DAYS = [
     "pátek", "sobota", "neděle"
 ]
 
-# ---------------------------------------
-# BOT
-# ---------------------------------------
 intents = discord.Intents.default()
 intents.members = True
+intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ---------------------------------------
@@ -91,7 +75,10 @@ async def on_ready():
 
     # Sync slash příkazů
     try:
-        synced = await bot.tree.sync(guild=discord.Object(id=GUILD_ID))
+        # Sync pro konkrétní guild
+        guild = discord.Object(id=GUILD_ID)
+        bot.tree.copy_global_to(guild=guild)
+        synced = await bot.tree.sync(guild=guild)
         print(f"📌 Slash příkazy synchronizovány: {len(synced)}")
     except Exception as e:
         print(f"Chyba při sync: {e}")
@@ -108,7 +95,11 @@ async def update_channels():
     # najít nebo vytvořit kategorii
     category = discord.utils.get(guild.categories, name=CATEGORY_NAME)
     if category is None:
-        category = await guild.create_category(CATEGORY_NAME)
+        try:
+            category = await guild.create_category(CATEGORY_NAME)
+        except Exception as e:
+            print(f"Chyba při vytváření kategorie: {e}")
+            return
 
     # dnešní den a datum
     weekday = datetime.datetime.now().weekday()  # 0=pondělí, 6=neděle
@@ -119,33 +110,53 @@ async def update_channels():
     wanted_names = [day_name, date_today, member_count]
 
     # zajistíme že máme přesně 3 kanály
-    existing = category.voice_channels
+    existing = [ch for ch in category.channels if isinstance(ch, discord.VoiceChannel)]
+    
+    # Seřadíme podle pozice
+    existing.sort(key=lambda x: x.position)
+    
+    # Vytvoříme chybějící kanály
     while len(existing) < 3:
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(connect=False, speak=False)
-        }
-        await category.create_voice_channel("dočasný", overwrites=overwrites)
-        existing = category.voice_channels
-
+        try:
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(connect=False, speak=False)
+            }
+            new_channel = await category.create_voice_channel("dočasný", overwrites=overwrites)
+            existing.append(new_channel)
+        except Exception as e:
+            print(f"Chyba při vytváření kanálu: {e}")
+            break
+    
+    # Seřadíme znovu po přidání
+    existing = [ch for ch in category.channels if isinstance(ch, discord.VoiceChannel)]
+    existing.sort(key=lambda x: x.position)
+    
     # přejmenujeme první tři kanály
     for channel, new_name in zip(existing[:3], wanted_names):
         if channel.name != new_name:
-            await channel.edit(name=new_name)
+            try:
+                await channel.edit(name=new_name)
+            except Exception as e:
+                print(f"Chyba při přejmenování kanálu {channel.name}: {e}")
 
-    # smažeme všechny kanály navíc
-    for channel in existing[3:]:
-        await channel.delete()
+    # smažeme všechny kanály navíc (pokud existují více než 3)
+    if len(existing) > 3:
+        for channel in existing[3:]:
+            try:
+                await channel.delete()
+                print(f"Smazán přebytečný kanál: {channel.name}")
+            except Exception as e:
+                print(f"Chyba při mazání kanálu {channel.name}: {e}")
 
 # ---------------------------------------
 # SLASH COMMAND: /whitelist
 # ---------------------------------------
 @bot.tree.command(
     name="whitelist",
-    description="Přidá hráče na whitelist",
-    guild=discord.Object(id=GUILD_ID)
+    description="Přidá hráče na whitelist"
 )
 @app_commands.describe(
-    hrac="Discord jméno hráče (např. User#1234)",
+    hrac="Discord jméno hráče (např. username)",
     stav="Zda hráč prošel nebo ne",
     chyby="Počet chyb (pokud prošel)"
 )
@@ -157,27 +168,23 @@ async def update_channels():
 )
 async def whitelist(interaction: discord.Interaction, hrac: str, stav: app_commands.Choice[str], chyby: int = 0):
     # Kontrola role
-    member = interaction.guild.get_member(interaction.user.id)
-    if not member:
-        return await interaction.response.send_message("❌ Nepodařilo se najít tvůj účet na serveru.", ephemeral=True)
-
-    if not any(role.id == ADDER_ROLE_ID for role in member.roles):
+    if not any(role.id == ADDER_ROLE_ID for role in interaction.user.roles):
         return await interaction.response.send_message("❌ Nemáš oprávnění použít tento příkaz.", ephemeral=True)
 
     guild = interaction.guild
     results_channel = guild.get_channel(RESULTS_CHANNEL_ID)
 
     if stav.value == "prosel":
-        # Najdi hráče podle jména
+        # Najdi hráče podle jména (bez discriminatoru, protože Discord už ho nepoužívá)
         target_member = None
         for guild_member in guild.members:
-            if str(guild_member) == hrac:
+            if guild_member.name == hrac or str(guild_member) == hrac or guild_member.display_name == hrac:
                 target_member = guild_member
                 break
         
         if not target_member:
             return await interaction.response.send_message(
-                f"❌ Hráč **{hrac}** nebyl nalezen na serveru. Zkontroluj, zda jsi zadal správné Discord jméno.", 
+                f"❌ Hráč **{hrac}** nebyl nalezen na serveru. Zkontroluj, zda jsi zadal správné jméno.", 
                 ephemeral=True
             )
         
@@ -198,7 +205,7 @@ async def whitelist(interaction: discord.Interaction, hrac: str, stav: app_comma
 
         embed = discord.Embed(
             title="✅ Hráč prošel whitelistem!",
-            description=f"**{hrac}** prošel s `{chyby}` chybami.\nGratulujeme! 🎉",
+            description=f"**{target_member.display_name}** prošel s `{chyby}` chybami.\nGratulujeme! 🎉",
             color=discord.Color.green()
         )
         
@@ -215,9 +222,9 @@ async def whitelist(interaction: discord.Interaction, hrac: str, stav: app_comma
             await results_channel.send(embed=embed)
 
         if role_assigned:
-            await interaction.response.send_message(f"✔ Hráč **{hrac}** byl whitelisted a role byla přidána.", ephemeral=True)
+            await interaction.response.send_message(f"✔ Hráč **{target_member.display_name}** byl whitelisted a role byla přidána.", ephemeral=True)
         else:
-            await interaction.response.send_message(f"✔ Hráč **{hrac}** byl whitelisted, ale role se nepodařila přidat. Přidej ji manuálně.", ephemeral=True)
+            await interaction.response.send_message(f"✔ Hráč **{target_member.display_name}** byl whitelisted, ale role se nepodařila přidat. Přidej ji manuálně.", ephemeral=True)
 
     elif stav.value == "neprosel":
         embed = discord.Embed(
@@ -237,8 +244,7 @@ async def whitelist(interaction: discord.Interaction, hrac: str, stav: app_comma
 # ---------------------------------------
 @bot.tree.command(
     name="help",
-    description="Ukáže nápovědu k příkazům",
-    guild=discord.Object(id=GUILD_ID)
+    description="Ukáže nápovědu k příkazům"
 )
 async def help_cmd(interaction: discord.Interaction):
     embed = discord.Embed(
@@ -249,7 +255,7 @@ async def help_cmd(interaction: discord.Interaction):
         name="/whitelist [hráč] [stav] [chyby]",
         value="Přidá hráče do whitelistu nebo ukáže, že neprošel.\n"
               "Použitelné jen s rolí `Whitelist Adder`.\n"
-              "**Poznámka:** Hráč musí být zadán v plném formátu (např. User#1234).",
+              "**Poznámka:** Zadej jméno hráče (bez #).",
         inline=False
     )
     embed.add_field(
@@ -264,8 +270,19 @@ async def help_cmd(interaction: discord.Interaction):
 # START
 # =========================
 if __name__ == "__main__":
-    # Spustí web server v jiném vlákně
+    # Ověření tokenu
+    if not BOT_TOKEN:
+        print("❌ Chybějící BOT_TOKEN v environment variables!")
+        exit(1)
+    
+    if not GUILD_ID:
+        print("❌ Chybějící GUILD_ID v environment variables!")
+        exit(1)
+    
+    # Spustí web server v jiném vlákně (jen na Renderu)
     threading.Thread(target=run_web, daemon=True).start()
+    print(f"🌐 Web server běží na portu {PORT}")
 
     # Spustí Discord bota
+    print("🤖 Spouštím Discord bota...")
     bot.run(BOT_TOKEN)
