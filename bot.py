@@ -183,14 +183,13 @@ def callback():
         'Content-Type': 'application/x-www-form-urlencoded'
     }
     
-    # SYNC verze s requests
     try:
         token_resp = requests.post('https://discord.com/api/oauth2/token', data=data, headers=headers, timeout=10)
-        token_resp.raise_for_status()  # Zkontroluje HTTP chyby
+        token_resp.raise_for_status()
         token_data = token_resp.json()
         
         if 'access_token' not in token_data:
-            flash("Chyba při získávání tokenu z Discordu", "error")
+            flash("Chyba při získávání tokenu", "error")
             return redirect("/")
         
         # Získání informací o uživateli
@@ -210,7 +209,7 @@ def callback():
         return redirect("/")
     except ValueError as e:
         print(f"Chyba parsování JSON: {e}")
-        flash("Chyba při zpracování odpovědi z Discordu", "error")
+        flash("Chyba při zpracování odpovědi", "error")
         return redirect("/")
     
     # Kontrola, zda je uživatel v guild
@@ -229,23 +228,15 @@ def callback():
     bot = get_bot()
     guild = bot.get_guild(GUILD_ID)
     
-    if not guild:
-        flash("Bot není připojen k serveru", "error")
-        return redirect("/")
+    if guild:
+        member = guild.get_member(int(user_data['id']))
+        if member:
+            has_permission = any(role.id == ADDER_ROLE_ID for role in member.roles)
+            session['has_permission'] = has_permission
+            if not has_permission:
+                flash("Nemáš oprávnění pro přístup do admin panelu!", "error")
+                return redirect("/")
     
-    member = guild.get_member(int(user_data['id']))
-    if not member:
-        flash("Nepodařilo se najít tvůj účet na serveru", "error")
-        return redirect("/")
-    
-    has_permission = any(role.id == ADDER_ROLE_ID for role in member.roles)
-    session['has_permission'] = has_permission
-    
-    if not has_permission:
-        flash("Nemáš oprávnění pro přístup do admin panelu!", "error")
-        return redirect("/")
-    
-    flash("Úspěšně přihlášen!", "success")
     return redirect("/dashboard")
 
 @app.route("/dashboard")
@@ -271,7 +262,7 @@ async def dashboard():
                          max_errors=MAX_ERRORS_ALLOWED)
 
 @app.route("/process/<member_id>", methods=['POST'])
-async def process_member(member_id):
+def process_member(member_id):  # SYNCHRONNÍ
     if 'user_id' not in session or not session.get('has_permission', False):
         return jsonify({'error': 'Unauthorized'}), 403
     
@@ -283,8 +274,8 @@ async def process_member(member_id):
         if passed and errors > MAX_ERRORS_ALLOWED:
             return jsonify({'error': f'Nad {MAX_ERRORS_ALLOWED} chyb nelze projít!'}), 400
         
-        # Zpracování whitelistu
-        success, message = await add_to_whitelist(
+        # SYNC volání Discord API
+        success, message = add_to_whitelist_sync(
             int(member_id), 
             errors, 
             passed,
@@ -297,13 +288,102 @@ async def process_member(member_id):
             return jsonify({'error': message}), 400
             
     except Exception as e:
+        print(f"Chyba při zpracování: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     flash("Byl jsi odhlášen", "info")
     return redirect("/")
+
+# ---------------------------------------
+# SYNCHRONNÍ POMOCNÉ FUNKCE
+# ---------------------------------------
+
+def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name: str):
+    """Přidá hráče na whitelist - SYNCHRONNÍ verze"""
+    bot = get_bot()
+    guild = bot.get_guild(GUILD_ID)
+    if not guild:
+        return False, "Bot není připojen k serveru"
+    
+    member = guild.get_member(member_id)
+    if not member:
+        return False, "Hráč nebyl nalezen na serveru"
+    
+    results_channel = guild.get_channel(RESULTS_CHANNEL_ID)
+    wl_role = guild.get_role(WL_ROLE_ID)
+    
+    if not wl_role:
+        return False, "Whitelist role nebyla nalezena"
+    
+    if passed:
+        # Přidání role - SYNCHRONNÍ
+        try:
+            # Musíme použít asyncio.run pro volání asynchronní funkce
+            import asyncio
+            
+            # Vytvoříme novou event loop pro tento thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Spustíme asynchronní operaci
+            future = asyncio.ensure_future(member.add_roles(wl_role))
+            loop.run_until_complete(future)
+            
+            role_assigned = True
+        except Exception as e:
+            role_assigned = False
+            print(f"Chyba při přidávání role: {e}")
+        
+        embed = discord.Embed(
+            title="✅ Hráč prošel whitelistem!",
+            description=f"**{member.display_name}** prošel s `{errors}` chybami.\nPřidal: {adder_name}\nGratulujeme! 🎉",
+            color=discord.Color.green()
+        )
+        
+        if not role_assigned:
+            embed.add_field(
+                name="⚠️ Upozornění",
+                value="Role se nepodařilo automaticky přidat. Prosím, přidej ji manuálně.",
+                inline=False
+            )
+        
+        embed.set_image(url="https://i.ibb.co/0Vs96g1h/sss.png")
+        
+        # Odeslání embedu - také synchronně
+        if results_channel:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                future = asyncio.ensure_future(results_channel.send(embed=embed))
+                loop.run_until_complete(future)
+            except Exception as e:
+                print(f"Chyba při odesílání zprávy: {e}")
+        
+        return True, f"Hráč {member.display_name} byl přidán na whitelist"
+    
+    else:
+        embed = discord.Embed(
+            title="❌ Hráč neprošel whitelistem!",
+            description=f"**{member.display_name}** neuspěl při whitelist testu.\nPřidal: {adder_name}",
+            color=discord.Color.red()
+        )
+        embed.set_image(url="https://i.ibb.co/84m4cfBZ/ssss.png")
+        
+        # Odeslání embedu
+        if results_channel:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                future = asyncio.ensure_future(results_channel.send(embed=embed))
+                loop.run_until_complete(future)
+            except Exception as e:
+                print(f"Chyba při odesílání zprávy: {e}")
+        
+        return True, f"Hráč {member.display_name} neprošel whitelistem"
 
 # ---------------------------------------
 # DISCORD BOT EVENTS
