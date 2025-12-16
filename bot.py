@@ -698,8 +698,25 @@ def setup_templates():
                 </div>
             </div>
         </div>
+        
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        <footer class="mt-5 py-3 text-center text-muted">
+        <div class="container">
+            <hr class="mb-3">
+            <p class="mb-0">
+                <small>
+                    Made with ❤️ by 
+                    <a href="https://github.com/koki26" target="_blank" class="text-decoration-none">koki26</a>
+                    | 
+                    <a href="https://github.com/koki26/info-bot" target="_blank" class="text-decoration-none">
+                        <i class="bi bi-github me-1"></i>GitHub
+                    </a>
+                </small>
+            </p>
+        </div>
+    </footer>
     </body>
+    
     </html>
     '''
     
@@ -1017,6 +1034,18 @@ def setup_templates():
                 document.getElementById('errorCount').addEventListener('input', validateErrors);
             });
         </script>
+        <footer class="mt-4 py-3 text-center">
+        <div class="container">
+            <hr class="mb-3">
+            <p class="mb-0 text-muted">
+                <small>
+                    Whitelist Bot v1.0 | Made by 
+                    <a href="https://github.com/koki26" target="_blank" class="text-decoration-none">koki26</a>
+                    © 2025
+                </small>
+            </p>
+        </div>
+    </footer>
     </body>
     </html>
     '''
