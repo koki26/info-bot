@@ -625,99 +625,113 @@ def setup_templates():
     
     # Home page template
     home_template = '''
-    <!DOCTYPE html>
-    <html lang="cs">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Whitelist Admin Panel</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-        <style>
-            body {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-            }
-            .card {
-                border: none;
-                border-radius: 15px;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            }
-            .btn-discord {
-                background-color: #5865F2;
-                color: white;
-                padding: 12px 30px;
-                font-size: 1.1rem;
-            }
-            .btn-discord:hover {
-                background-color: #4752C4;
-                color: white;
-            }
-            .login-container {
-                max-width: 500px;
-                margin: auto;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="login-container">
-                <div class="card">
-                    <div class="card-body p-5">
-                        <div class="text-center mb-4">
-                            <i class="bi bi-shield-check display-1 text-primary"></i>
-                            <h2 class="mt-3">Whitelist Admin Panel</h2>
-                            <p class="text-muted">Přihlaste se pomocí Discord účtu</p>
-                        </div>
-                        
-                        {% with messages = get_flashed_messages(with_categories=true) %}
-                            {% if messages %}
-                                {% for category, message in messages %}
-                                    <div class="alert alert-{{ 'danger' if category == 'error' else 'info' }} alert-dismissible fade show" role="alert">
-                                        {{ message }}
-                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                    </div>
-                                {% endfor %}
-                            {% endif %}
-                        {% endwith %}
-                        
-                        <div class="d-grid gap-2">
-                            <a href="/admin" class="btn btn-discord">
-                                <i class="bi bi-discord me-2"></i> Přihlásit se přes Discord
-                            </a>
-                        </div>
-                        
-                        <div class="mt-4 text-center">
-                            <small class="text-muted">
-                                Pro přístup potřebujete roli "Whitelist Adder" na Discord serveru
-                            </small>
-                        </div>
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whitelist Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        .btn-discord {
+            background-color: #5865F2;
+            color: white;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+        }
+        .btn-discord:hover {
+            background-color: #4752C4;
+            color: white;
+        }
+        .login-container {
+            max-width: 500px;
+            margin: auto;
+        }
+        /* Footer styling */
+        .footer {
+            margin-top: 2rem;
+            padding: 1rem 0;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+        .footer a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+        }
+        .footer a:hover {
+            color: white;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="login-container">
+            <!-- Login Card -->
+            <div class="card">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-shield-check display-1 text-primary"></i>
+                        <h2 class="mt-3">Whitelist Admin Panel</h2>
+                        <p class="text-muted">Přihlaste se pomocí Discord účtu</p>
+                    </div>
+                    
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else 'info' }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <div class="d-grid gap-2">
+                        <a href="/admin" class="btn btn-discord">
+                            <i class="bi bi-discord me-2"></i> Přihlásit se přes Discord
+                        </a>
+                    </div>
+                    
+                    <div class="mt-4 text-center">
+                        <small class="text-muted">
+                            Pro přístup potřebujete roli "Whitelist Adder" na Discord serveru
+                        </small>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-        <footer class="mt-5 py-3 text-center text-muted">
-        <div class="container">
-            <hr class="mb-3">
-            <p class="mb-0">
-                <small>
+            
+            <!-- Footer-->
+            <div class="footer text-center mt-4">
+                <hr class="my-3" style="border-color: rgba(255,255,255,0.2);">
+                <p class="mb-0">
                     Made with ❤️ by 
-                    <a href="https://github.com/koki26" target="_blank" class="text-decoration-none">koki26</a>
+                    <a href="https://github.com/koki26" target="_blank">koki26</a>
                     | 
-                    <a href="https://github.com/koki26/info-bot" target="_blank" class="text-decoration-none">
+                    <a href="https://github.com/koki26/info-bot" target="_blank">
                         <i class="bi bi-github me-1"></i>GitHub
                     </a>
-                </small>
-            </p>
+                </p>
+                <small class="text-muted">© 2025 Discord Whitelist Bot</small>
+            </div>
         </div>
-    </footer>
-    </body>
+    </div>
     
-    </html>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
     '''
     
     # Dashboard template
