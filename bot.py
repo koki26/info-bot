@@ -863,7 +863,7 @@ def setup_templates():
                                 
                                 <div class="d-grid gap-2">
                                     <button class="btn btn-success" onclick="openReviewModal('{{ member.id }}', '{{ member.display_name|e }}', '{{ member.avatar_url }}')">
-                                        <i class="bi bi-check-circle me-2"></i> Zkontrolovat
+                                        <i class="bi bi-check-circle me-2"></i> Přidat do whitelistu
                                     </button>
                                 </div>
                             </div>
@@ -1039,7 +1039,7 @@ def setup_templates():
             <hr class="mb-3">
             <p class="mb-0 text-muted">
                 <small>
-                    Whitelist Bot v1.0 | Made by 
+                    Whitelist Bot | Made by 
                     <a href="https://github.com/koki26" target="_blank" class="text-decoration-none">koki26</a>
                     © 2025
                 </small>
