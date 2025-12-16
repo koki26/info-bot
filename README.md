@@ -232,14 +232,6 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
    - Pošle oznámení do výsledného kanálu
    - Aktualizuje seznam čekajících
 
-## 🛠️ Technologie
-
-- **Discord.py 2.0+** - Discord bot API
-- **Flask 2.0+** - Webový framework
-- **aiohttp** - Asynchronní HTTP klient
-- **Bootstrap 5** - Frontend framework
-- **Discord OAuth2** - Autentizace
-
 ## ❌ Řešení problémů
 
 ### Bot se nespustí
