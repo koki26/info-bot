@@ -12,8 +12,8 @@ import datetime
 import os
 from dotenv import load_dotenv
 import asyncio
-import aiohttp
 from flask import Flask, render_template, request, redirect, session, flash, jsonify
+import requests
 import secrets
 import json
 from typing import List, Dict
@@ -164,7 +164,7 @@ def admin():
     return redirect("/dashboard")
 
 @app.route("/callback")
-async def callback():
+def callback():
     code = request.args.get('code')
     if not code:
         return "Chyba: Chybí autorizační kód", 400
@@ -179,45 +179,74 @@ async def callback():
         'scope': 'identify guilds'
     }
     
-    async with aiohttp.ClientSession() as session_http:
-        async with session_http.post('https://discord.com/api/oauth2/token', data=data) as token_resp:
-            token_data = await token_resp.json()
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+    }
+    
+    # SYNC verze s requests
+    try:
+        token_resp = requests.post('https://discord.com/api/oauth2/token', data=data, headers=headers, timeout=10)
+        token_resp.raise_for_status()  # Zkontroluje HTTP chyby
+        token_data = token_resp.json()
         
         if 'access_token' not in token_data:
-            return "Chyba při získávání tokenu", 400
+            flash("Chyba při získávání tokenu z Discordu", "error")
+            return redirect("/")
         
         # Získání informací o uživateli
-        headers = {'Authorization': f'Bearer {token_data["access_token"]}'}
-        async with session_http.get('https://discord.com/api/users/@me', headers=headers) as user_resp:
-            user_data = await user_resp.json()
+        auth_headers = {'Authorization': f'Bearer {token_data["access_token"]}'}
         
-        # Kontrola, zda je uživatel v guild
-        async with session_http.get('https://discord.com/api/users/@me/guilds', headers=headers) as guilds_resp:
-            guilds_data = await guilds_resp.json()
+        user_resp = requests.get('https://discord.com/api/users/@me', headers=auth_headers, timeout=10)
+        user_resp.raise_for_status()
+        user_data = user_resp.json()
         
-        user_in_guild = any(str(guild['id']) == str(GUILD_ID) for guild in guilds_data)
+        guilds_resp = requests.get('https://discord.com/api/users/@me/guilds', headers=auth_headers, timeout=10)
+        guilds_resp.raise_for_status()
+        guilds_data = guilds_resp.json()
         
-        if not user_in_guild:
-            return "Nejsi členem tohoto Discord serveru!", 403
-        
-        # Uložení do session
-        session['user_id'] = user_data['id']
-        session['username'] = user_data['username']
-        session['avatar'] = user_data.get('avatar', '')
-        
-        # Kontrola role přímo přes Discord bota
-        bot = get_bot()
-        guild = bot.get_guild(GUILD_ID)
-        if guild:
-            member = guild.get_member(int(user_data['id']))
-            if member:
-                has_permission = any(role.id == ADDER_ROLE_ID for role in member.roles)
-                session['has_permission'] = has_permission
-                if not has_permission:
-                    flash("Nemáš oprávnění pro přístup do admin panelu!", "error")
-                    return redirect("/")
-        
-        return redirect("/dashboard")
+    except requests.exceptions.RequestException as e:
+        print(f"Chyba HTTP requestu: {e}")
+        flash("Chyba při komunikaci s Discord API", "error")
+        return redirect("/")
+    except ValueError as e:
+        print(f"Chyba parsování JSON: {e}")
+        flash("Chyba při zpracování odpovědi z Discordu", "error")
+        return redirect("/")
+    
+    # Kontrola, zda je uživatel v guild
+    user_in_guild = any(str(guild['id']) == str(GUILD_ID) for guild in guilds_data)
+    
+    if not user_in_guild:
+        flash("Nejsi členem tohoto Discord serveru!", "error")
+        return redirect("/")
+    
+    # Uložení do session
+    session['user_id'] = user_data['id']
+    session['username'] = user_data['username']
+    session['avatar'] = user_data.get('avatar', '')
+    
+    # Kontrola role přímo přes Discord bota
+    bot = get_bot()
+    guild = bot.get_guild(GUILD_ID)
+    
+    if not guild:
+        flash("Bot není připojen k serveru", "error")
+        return redirect("/")
+    
+    member = guild.get_member(int(user_data['id']))
+    if not member:
+        flash("Nepodařilo se najít tvůj účet na serveru", "error")
+        return redirect("/")
+    
+    has_permission = any(role.id == ADDER_ROLE_ID for role in member.roles)
+    session['has_permission'] = has_permission
+    
+    if not has_permission:
+        flash("Nemáš oprávnění pro přístup do admin panelu!", "error")
+        return redirect("/")
+    
+    flash("Úspěšně přihlášen!", "success")
+    return redirect("/dashboard")
 
 @app.route("/dashboard")
 async def dashboard():
