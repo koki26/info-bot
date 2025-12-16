@@ -9,11 +9,10 @@ Kompletní Discord bot pro správu whitelistu s webovým admin panelem. Obsahuje
 ## 📋 Obsah
 - [Funkce](#-funkce)
 - [Instalace - Lokální vývoj](#-instalace---lokální-vývoj)
-- [Deploy na Render.com](#-deploy-na-rendercom)
-- [Konfigurace](#-konfigurace)
+- [Deploy na Render.com](#%EF%B8%8F-deploy-na-rendercom)
+- [Konfigurace](#%EF%B8%8F-konfigurace)
 - [Použití](#-použití)
-- [Technologie](#-technologie)
-- [Podpora](#-podpora)
+- [Podpora](#-kontakt-a-podpora)
 
 ## ✨ Funkce
 
