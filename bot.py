@@ -10,11 +10,21 @@ from discord import app_commands
 import datetime
 from dotenv import load_dotenv
 import os
+import threading
+from flask import Flask
 
+# =========================
+# ENV
+# =========================
 load_dotenv()
 
-GUILD_ID = int(os.getenv("GUILD_ID"))  # tvůj server ID
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+GUILD_ID = int(os.getenv("GUILD_ID"))
+PORT = int(os.environ.get("PORT", 10000))  # Render PORT
+
+# ---------------------------------------
+# KONFIGURACE
+# ---------------------------------------
 
 # Info kanály
 CATEGORY_NAME = "📅 Info"
@@ -23,6 +33,29 @@ CATEGORY_NAME = "📅 Info"
 WL_ROLE_ID = 1415780201681391616     # ID role "Whitelisted"
 ADDER_ROLE_ID = 1415779903219175475   # ID role "Whitelist Adder"
 RESULTS_CHANNEL_ID = 1415779774286008451  # ID kanálu #wl-vysledky
+
+# =========================
+# FLASK WEB SERVER (pro Render)
+# =========================
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "✅ Discord bot is running."
+
+def run_web():
+    app.run(host="0.0.0.0", port=PORT)
+
+# =========================
+# DISCORD BOT
+# =========================
+intents = discord.Intents.default()
+intents.members = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f"🤖 Bot přihlášen jako {bot.user}")
 
 # České názvy dní
 CZECH_DAYS = [
@@ -227,7 +260,12 @@ async def help_cmd(interaction: discord.Interaction):
     embed.set_footer(text="ℹ️ Info kanály (den, datum, počet lidí) běží automaticky.")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# ---------------------------------------
+# =========================
 # START
-# ---------------------------------------
-bot.run(BOT_TOKEN)
+# =========================
+if __name__ == "__main__":
+    # Spustí web server v jiném vlákně
+    threading.Thread(target=run_web, daemon=True).start()
+
+    # Spustí Discord bota
+    bot.run(BOT_TOKEN)
