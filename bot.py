@@ -303,7 +303,7 @@ def logout():
 # ---------------------------------------
 
 def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name: str):
-    """Přidá hráče na whitelist - SYNCHRONNÍ verze"""
+    """Přidá hráče na whitelist - SYNCHRONNÍ verze s kompletní funkcí"""
     bot = get_bot()
     guild = bot.get_guild(GUILD_ID)
     if not guild:
@@ -319,71 +319,73 @@ def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name:
     if not wl_role:
         return False, "Whitelist role nebyla nalezena"
     
-    if passed:
-        # Přidání role - SYNCHRONNÍ
-        try:
-            # Musíme použít asyncio.run pro volání asynchronní funkce
-            import asyncio
-            
-            # Vytvoříme novou event loop pro tento thread
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-            # Spustíme asynchronní operaci
-            future = asyncio.ensure_future(member.add_roles(wl_role))
-            loop.run_until_complete(future)
-            
-            role_assigned = True
-        except Exception as e:
-            role_assigned = False
-            print(f"Chyba při přidávání role: {e}")
-        
-        embed = discord.Embed(
-            title="✅ Hráč prošel whitelistem!",
-            description=f"**{member.display_name}** prošel s `{errors}` chybami.\nPřidal: {adder_name}\nGratulujeme! 🎉",
-            color=discord.Color.green()
-        )
-        
-        if not role_assigned:
-            embed.add_field(
-                name="⚠️ Upozornění",
-                value="Role se nepodařilo automaticky přidat. Prosím, přidej ji manuálně.",
-                inline=False
-            )
-        
-        embed.set_image(url="https://i.ibb.co/0Vs96g1h/sss.png")
-        
-        # Odeslání embedu - také synchronně
-        if results_channel:
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                future = asyncio.ensure_future(results_channel.send(embed=embed))
-                loop.run_until_complete(future)
-            except Exception as e:
-                print(f"Chyba při odesílání zprávy: {e}")
-        
-        return True, f"Hráč {member.display_name} byl přidán na whitelist"
+    # Vytvoří novou event loop pro tento thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
-    else:
-        embed = discord.Embed(
-            title="❌ Hráč neprošel whitelistem!",
-            description=f"**{member.display_name}** neuspěl při whitelist testu.\nPřidal: {adder_name}",
-            color=discord.Color.red()
-        )
-        embed.set_image(url="https://i.ibb.co/84m4cfBZ/ssss.png")
-        
-        # Odeslání embedu
-        if results_channel:
+    try:
+        if passed:
+            # 1. PŘIDÁNÍ ROLE
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                future = asyncio.ensure_future(results_channel.send(embed=embed))
-                loop.run_until_complete(future)
+                # Spustí asynchronní operaci přidání role
+                loop.run_until_complete(member.add_roles(wl_role))
+                role_assigned = True
             except Exception as e:
-                print(f"Chyba při odesílání zprávy: {e}")
+                role_assigned = False
+                print(f"Chyba při přidávání role: {e}")
+            
+            # 2. VYTVOŘENÍ EMBED ZPRÁVY
+            embed = discord.Embed(
+                title="✅ Hráč prošel whitelistem!",
+                description=f"**{member.display_name}** prošel s `{errors}` chybami.\nPřidal: {adder_name}\nGratulujeme! 🎉",
+                color=discord.Color.green()
+            )
+            
+            if not role_assigned:
+                embed.add_field(
+                    name="⚠️ Upozornění",
+                    value="Role se nepodařilo automaticky přidat. Prosím, přidej ji manuálně.",
+                    inline=False
+                )
+            
+            embed.set_image(url="https://i.ibb.co/0Vs96g1h/sss.png")
+            
+            # 3. ODESLÁNÍ ZPRÁVY DO KANÁLU
+            if results_channel:
+                try:
+                    loop.run_until_complete(results_channel.send(embed=embed))
+                except Exception as e:
+                    print(f"Chyba při odesílání zprávy: {e}")
+            
+            message = f"Hráč {member.display_name} byl přidán na whitelist"
+            if not role_assigned:
+                message += ", ale role se nepodařila přidat"
+            message += "."
+            
+            return True, message
         
-        return True, f"Hráč {member.display_name} neprošel whitelistem"
+        else:  # Neprošel
+            # VYTVOŘENÍ A ODESLÁNÍ EMBED PRO NEPROŠLÉHO
+            embed = discord.Embed(
+                title="❌ Hráč neprošel whitelistem!",
+                description=f"**{member.display_name}** neuspěl při whitelist testu.\nPřidal: {adder_name}",
+                color=discord.Color.red()
+            )
+            embed.set_image(url="https://i.ibb.co/84m4cfBZ/ssss.png")
+            
+            if results_channel:
+                try:
+                    loop.run_until_complete(results_channel.send(embed=embed))
+                except Exception as e:
+                    print(f"Chyba při odesílání zprávy: {e}")
+            
+            return True, f"Hráč {member.display_name} neprošel whitelistem"
+            
+    except Exception as e:
+        print(f"Obecná chyba v add_to_whitelist_sync: {e}")
+        return False, f"Chyba při zpracování: {str(e)}"
+    finally:
+        loop.close()
 
 # ---------------------------------------
 # DISCORD BOT EVENTS
