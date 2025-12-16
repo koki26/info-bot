@@ -8,12 +8,13 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import datetime
+from dotenv import load_dotenv
+import os
 
-# ---------------------------------------
-# KONFIGURACE
-# ---------------------------------------
-GUILD_ID = 123456789012345678  # tvůj server ID
-BOT_TOKEN = "TVŮJ_TOKEN"
+load_dotenv()
+
+GUILD_ID = int(os.getenv("GUILD_ID"))  # tvůj server ID
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # Info kanály
 CATEGORY_NAME = "📅 Info"

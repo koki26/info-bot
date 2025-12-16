@@ -1,72 +1,112 @@
-# 📅 Discord Info Bot
+# 📅 Discord Info & Whitelist Bot
 
-Jednoduchý Discord bot, který automaticky spravuje informační kanály na tvém serveru.
-Ukáže **aktuální den**, **datum** a **počet členů** na serveru. 🔥
+Moderní Discord bot, který **automaticky spravuje informační kanály**
+a zároveň poskytuje **whitelist systém přes slash příkazy**.
+
+Bot zobrazuje **aktuální den, datum a počet členů** a umožňuje
+spravovat whitelist přehledně a bezpečně. 🚀
 
 ---
 
 ## ✨ Funkce
-- ✅ Automaticky vytvoří kategorii `📅 Info`
-- 📌 Uvnitř kategorie udržuje **přesně 3 kanály**:
-  - Den v týdnu (např. `📅 pondělí`)
-  - Aktuální datum (např. `🗓️ 10-09-2025`)
-  - Počet členů na serveru (např. `👥 128 lidí`)
-- 🔄 Kanály se automaticky **aktualizují každou minutu**
-- 🚫 Do kanálů se **nedá připojit** (slouží jen jako info)
-- 🗑️ Bot smaže nadbytečné kanály → vždy zůstanou jen 3
 
+### 📅 Info kanály
+- ✅ Automaticky vytvoří kategorii `📅 Info`
+- 📌 Udržuje **přesně 3 hlasové kanály**:
+  - 📅 Aktuální den v týdnu (česky)
+  - 🗓️ Aktuální datum
+  - 👥 Počet členů na serveru
+- 🔄 Automatická aktualizace **každou minutu**
+- 🚫 Do kanálů se **nelze připojit** (slouží pouze jako informace)
+- 🗑️ Nadbytečné kanály jsou automaticky odstraněny
+
+---
+
+### 🤖 Slash příkazy
+- `/help` – zobrazí nápovědu k příkazům
+- `/whitelist` – správa whitelistu hráčů
+
+---
+
+### 📝 Whitelist systém
+- ➕ Přidání hráče na whitelist
+- ❌ Označení hráče jako „neprošel“
+- 🎭 Automatické přidání **Whitelist role**
+- 🔐 Pouze pro uživatele s rolí **Whitelist Adder**
+- 📢 Výsledky jsou odesílány do určeného kanálu
+- 🎨 Přehledné embed zprávy s obrázky (Možnost upravit v kódu)
+
+---
+
+### 🔐 Bezpečnost
+- 🔑 Token a ID serveru jsou načítány z `.env` souboru
+- 🚫 Žádné citlivé údaje nejsou přímo v kódu
 
 ---
 
 ## 🛠️ Instalace
 
-1. Naklonuj si projekt nebo zkopíruj kód
-   ```bash
-   git clone https://github.com/koki26/info-bot.git
-   cd info-bot
-   ```
-2. Nainstaluj potřebné knihovny
+### 1️⃣ Klonování projektu
+```bash
+git clone https://github.com/koki26/info-bot.git
+cd info-bot
+````
 
-    ```bash
-    pip install discord.py
-    ```
-3. Otevři main.py a nastav:
+---
+
+### 2️⃣ Instalace závislostí
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+### 3️⃣ upravení `.env` souboru
+
+V kořenové složce uprav soubor `.env`:
+
+```env
+GUILD_ID=123456789012345678
+BOT_TOKEN=TVUJ_DISCORD_BOT_TOKEN
+```
 
 
-    - GUILD_ID = 123456789012345678  # ID tvého serveru
-    - bot.run("TVŮJ_TOKEN")
+---
 
-4. Spusť bota
+### 4️⃣ Spuštění bota
 
-    ```bash
-    python main.py
-    ```
+```bash
+python main.py
+```
 
 ---
 
 ## ⚙️ Požadavky
 
-    Python 3.8+
-    discord.py
-
+* Python **3.8+**
+* `discord.py`
+* `python-dotenv`
 
 ---
 
 ## 🎨 Ukázka
-Kategorie bude vypadat takto:
 
+Kategorie na serveru:
+
+```
 📅 Info
-
 ┣ 📅 středa
-
 ┣ 🗓️ 10-09-2025
-
 ┗ 👥 128 lidí
-
+```
 
 ---
 
 ## 👤 Autor
-Vytvořil s láskou **Koki26** pro Saryho ❤️
+
+Vytvořil s láskou **Koki26** ❤️
+Pro Saryho.
 
 ---
+
