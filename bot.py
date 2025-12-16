@@ -303,7 +303,7 @@ def logout():
 # ---------------------------------------
 
 def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name: str):
-    """Přidá hráče na whitelist - SYNCHRONNÍ verze s kompletní funkcí"""
+    """Přidá hráče na whitelist"""
     bot = get_bot()
     guild = bot.get_guild(GUILD_ID)
     if not guild:
@@ -319,22 +319,32 @@ def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name:
     if not wl_role:
         return False, "Whitelist role nebyla nalezena"
     
-    # Vytvoří novou event loop pro tento thread
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # Získáme event loop z bota (který běží v hlavním threadu)
+    bot_loop = bot.loop
     
     try:
         if passed:
-            # 1. PŘIDÁNÍ ROLE
+            # 1. PŘIDÁNÍ ROLE pomocí run_coroutine_threadsafe
             try:
-                # Spustí asynchronní operaci přidání role
-                loop.run_until_complete(member.add_roles(wl_role))
+                # Toto pošle coroutine do správné event loop bota
+                future = asyncio.run_coroutine_threadsafe(
+                    member.add_roles(wl_role),
+                    bot_loop
+                )
+                # Počkáme na dokončení
+                future.result(timeout=10)  # 10 sekund timeout
                 role_assigned = True
+            except asyncio.TimeoutError:
+                role_assigned = False
+                print("Timeout při přidávání role!")
+            except discord.Forbidden:
+                role_assigned = False
+                print("Bot nemá oprávnění přidávat role!")
             except Exception as e:
                 role_assigned = False
                 print(f"Chyba při přidávání role: {e}")
             
-            # 2. VYTVOŘENÍ EMBED ZPRÁVY
+            # 2. VYTVOŘENÍ EMBED (stejné jako v /whitelist commandu)
             embed = discord.Embed(
                 title="✅ Hráč prošel whitelistem!",
                 description=f"**{member.display_name}** prošel s `{errors}` chybami.\nPřidal: {adder_name}\nGratulujeme! 🎉",
@@ -353,10 +363,15 @@ def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name:
             # 3. ODESLÁNÍ ZPRÁVY DO KANÁLU
             if results_channel:
                 try:
-                    loop.run_until_complete(results_channel.send(embed=embed))
+                    future = asyncio.run_coroutine_threadsafe(
+                        results_channel.send(embed=embed),
+                        bot_loop
+                    )
+                    future.result(timeout=10)
                 except Exception as e:
                     print(f"Chyba při odesílání zprávy: {e}")
             
+            # 4. VRÁCENÍ ZPRÁVY
             message = f"Hráč {member.display_name} byl přidán na whitelist"
             if not role_assigned:
                 message += ", ale role se nepodařila přidat"
@@ -375,7 +390,11 @@ def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name:
             
             if results_channel:
                 try:
-                    loop.run_until_complete(results_channel.send(embed=embed))
+                    future = asyncio.run_coroutine_threadsafe(
+                        results_channel.send(embed=embed),
+                        bot_loop
+                    )
+                    future.result(timeout=10)
                 except Exception as e:
                     print(f"Chyba při odesílání zprávy: {e}")
             
@@ -384,8 +403,6 @@ def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name:
     except Exception as e:
         print(f"Obecná chyba v add_to_whitelist_sync: {e}")
         return False, f"Chyba při zpracování: {str(e)}"
-    finally:
-        loop.close()
 
 # ---------------------------------------
 # DISCORD BOT EVENTS
