@@ -38,6 +38,7 @@ CATEGORY_NAME = "📅 Info"
 WL_ROLE_ID = 1415780201681391616     # ID role "Whitelisted"
 ADDER_ROLE_ID = 1415779903219175475   # ID role "Whitelist Adder"
 RESULTS_CHANNEL_ID = 1415779774286008451  # ID kanálu #wl-vysledky
+REMOVE_ROLE_ID = int(os.environ.get("REMOVE_ROLE_ID", 1375176301023068181))  # ID role k odebrání při udělení whitelistu
 
 # OAuth2
 CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID")
@@ -92,7 +93,7 @@ async def get_non_whitelisted_members(guild):
     return non_whitelisted
 
 async def add_to_whitelist(member_id: int, errors: int, passed: bool, adder_name: str):
-    """Přidá hráče na whitelist"""
+    """Přidá hráče na whitelist a odebere roli pokud je definována"""
     guild = get_bot().get_guild(GUILD_ID)
     if not guild:
         return False, "Guild not found"
@@ -107,14 +108,28 @@ async def add_to_whitelist(member_id: int, errors: int, passed: bool, adder_name
     if not wl_role:
         return False, "Whitelist role not found"
     
+    # Role k odebrání (pokud je definována)
+    remove_role = None
+    if REMOVE_ROLE_ID > 0:
+        remove_role = guild.get_role(REMOVE_ROLE_ID)
+    
     if passed:
-        # Přidání role
+        # Přidání role whitelist
         try:
             await member.add_roles(wl_role)
             role_assigned = True
         except Exception as e:
             role_assigned = False
-            print(f"Chyba při přidávání role: {e}")
+            print(f"Chyba při přidávání whitelist role: {e}")
+        
+        # Odebrání role (pokud existuje)
+        role_removed = False
+        if remove_role and remove_role in member.roles:
+            try:
+                await member.remove_roles(remove_role)
+                role_removed = True
+            except Exception as e:
+                print(f"Chyba při odebírání role: {e}")
         
         embed = discord.Embed(
             title="✅ Hráč prošel whitelistem!",
@@ -122,12 +137,27 @@ async def add_to_whitelist(member_id: int, errors: int, passed: bool, adder_name
             color=discord.Color.green()
         )
         
-        if not role_assigned:
+        # Přidání informací o rolích do embedu
+        if not role_assigned or (remove_role and not role_removed):
             embed.add_field(
                 name="⚠️ Upozornění",
-                value="Role se nepodařilo automaticky přidat. Prosím, přidej ji manuálně.",
+                value="",
                 inline=False
             )
+            
+            if not role_assigned:
+                embed.add_field(
+                    name="Role whitelist",
+                    value="Nepodařilo se automaticky přidat. Prosím, přidej ji manuálně.",
+                    inline=True
+                )
+            
+            if remove_role and not role_removed:
+                embed.add_field(
+                    name=f"Role {remove_role.name}",
+                    value="Nepodařilo se automaticky odebrat. Prosím, odeber ji manuálně.",
+                    inline=True
+                )
         
         embed.set_image(url="https://i.ibb.co/0Vs96g1h/sss.png")
         
@@ -305,7 +335,7 @@ def logout():
 # ---------------------------------------
 
 def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name: str):
-    """Přidá hráče na whitelist"""
+    """Přidá hráče na whitelist a odebere roli pokud je definována"""
     bot = get_bot()
     guild = bot.get_guild(GUILD_ID)
     if not guild:
@@ -321,48 +351,86 @@ def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name:
     if not wl_role:
         return False, "Whitelist role nebyla nalezena"
     
+    # Role k odebrání (pokud je definována)
+    remove_role = None
+    if REMOVE_ROLE_ID > 0:
+        remove_role = guild.get_role(REMOVE_ROLE_ID)
+    
     # Získáme event loop z bota (který běží v hlavním threadu)
     bot_loop = bot.loop
     
     try:
         if passed:
-            # 1. PŘIDÁNÍ ROLE pomocí run_coroutine_threadsafe
+            # 1. PŘIDÁNÍ ROLE whitelist pomocí run_coroutine_threadsafe
             try:
-                # Toto pošle coroutine do správné event loop bota
                 future = asyncio.run_coroutine_threadsafe(
                     member.add_roles(wl_role),
                     bot_loop
                 )
-                # Počkáme na dokončení
                 future.result(timeout=10)  # 10 sekund timeout
                 role_assigned = True
             except asyncio.TimeoutError:
                 role_assigned = False
-                print("Timeout při přidávání role!")
+                print("Timeout při přidávání whitelist role!")
             except discord.Forbidden:
                 role_assigned = False
                 print("Bot nemá oprávnění přidávat role!")
             except Exception as e:
                 role_assigned = False
-                print(f"Chyba při přidávání role: {e}")
+                print(f"Chyba při přidávání whitelist role: {e}")
             
-            # 2. VYTVOŘENÍ EMBED (stejné jako v /whitelist commandu)
+            # 2. ODEBRÁNÍ ROLE (pokud existuje)
+            role_removed = False
+            if remove_role and remove_role in member.roles:
+                try:
+                    future = asyncio.run_coroutine_threadsafe(
+                        member.remove_roles(remove_role),
+                        bot_loop
+                    )
+                    future.result(timeout=10)
+                    role_removed = True
+                except asyncio.TimeoutError:
+                    role_removed = False
+                    print("Timeout při odebírání role!")
+                except discord.Forbidden:
+                    role_removed = False
+                    print("Bot nemá oprávnění odebírat role!")
+                except Exception as e:
+                    role_removed = False
+                    print(f"Chyba při odebírání role: {e}")
+            
+            # 3. VYTVOŘENÍ EMBED (stejné jako v /whitelist commandu)
             embed = discord.Embed(
                 title="✅ Hráč prošel whitelistem!",
                 description=f"**{member.display_name}** prošel s `{errors}` chybami.\nPřidal: {adder_name}\nGratulujeme! 🎉",
                 color=discord.Color.green()
             )
             
-            if not role_assigned:
+            # Přidání informací o rolích do embedu
+            if not role_assigned or (remove_role and not role_removed):
                 embed.add_field(
                     name="⚠️ Upozornění",
-                    value="Role se nepodařilo automaticky přidat. Prosím, přidej ji manuálně.",
+                    value="",
                     inline=False
                 )
+                
+                if not role_assigned:
+                    embed.add_field(
+                        name="Role whitelist",
+                        value="Nepodařilo se automaticky přidat. Prosím, přidej ji manuálně.",
+                        inline=True
+                    )
+                
+                if remove_role and not role_removed:
+                    embed.add_field(
+                        name=f"Role {remove_role.name}",
+                        value="Nepodařilo se automaticky odebrat. Prosím, odeber ji manuálně.",
+                        inline=True
+                    )
             
             embed.set_image(url="https://i.ibb.co/0Vs96g1h/sss.png")
             
-            # 3. ODESLÁNÍ ZPRÁVY DO KANÁLU
+            # 4. ODESLÁNÍ ZPRÁVY DO KANÁLU
             if results_channel:
                 try:
                     future = asyncio.run_coroutine_threadsafe(
@@ -373,10 +441,12 @@ def add_to_whitelist_sync(member_id: int, errors: int, passed: bool, adder_name:
                 except Exception as e:
                     print(f"Chyba při odesílání zprávy: {e}")
             
-            # 4. VRÁCENÍ ZPRÁVY
+            # 5. VRÁCENÍ ZPRÁVY
             message = f"Hráč {member.display_name} byl přidán na whitelist"
             if not role_assigned:
-                message += ", ale role se nepodařila přidat"
+                message += ", ale whitelist role se nepodařila přidat"
+            if remove_role and not role_removed:
+                message += f", a role {remove_role.name} se nepodařila odebrat"
             message += "."
             
             return True, message
@@ -492,7 +562,7 @@ async def update_channels():
                 print(f"Chyba při mazání kanálu {channel.name}: {e}")
 
 # ---------------------------------------
-# SLASH COMMANDS (původní funkce)
+# SLASH COMMANDS (původní funkce + odebrání role)
 # ---------------------------------------
 @bot.tree.command(
     name="whitelist",
@@ -539,12 +609,27 @@ async def whitelist(interaction: discord.Interaction, hrac: str, stav: app_comma
         if not wl_role:
             return await interaction.response.send_message("❌ Whitelist role nebyla nalezena.", ephemeral=True)
         
+        # Odebrání role (pokud je definována)
+        remove_role = None
+        if REMOVE_ROLE_ID > 0:
+            remove_role = guild.get_role(REMOVE_ROLE_ID)
+        
         try:
             await target_member.add_roles(wl_role)
             role_assigned = True
         except Exception as e:
             role_assigned = False
-            print(f"Chyba při přidávání role: {e}")
+            print(f"Chyba při přidávání whitelist role: {e}")
+        
+        # Odebrání role
+        role_removed = False
+        if remove_role and remove_role in target_member.roles:
+            try:
+                await target_member.remove_roles(remove_role)
+                role_removed = True
+            except Exception as e:
+                role_removed = False
+                print(f"Chyba při odebírání role: {e}")
         
         embed = discord.Embed(
             title="✅ Hráč prošel whitelistem!",
@@ -552,12 +637,27 @@ async def whitelist(interaction: discord.Interaction, hrac: str, stav: app_comma
             color=discord.Color.green()
         )
         
-        if not role_assigned:
+        # Přidání informací o rolích do embedu
+        if not role_assigned or (remove_role and not role_removed):
             embed.add_field(
                 name="⚠️ Upozornění",
-                value="Role se nepodařilo automaticky přidat. Prosím, přidej ji manuálně.",
+                value="",
                 inline=False
             )
+            
+            if not role_assigned:
+                embed.add_field(
+                    name="Role whitelist",
+                    value="Nepodařilo se automaticky přidat. Prosím, přidej ji manuálně.",
+                    inline=True
+                )
+            
+            if remove_role and not role_removed:
+                embed.add_field(
+                    name=f"Role {remove_role.name}",
+                    value="Nepodařilo se automaticky odebrat. Prosím, odeber ji manuálně.",
+                    inline=True
+                )
         
         embed.set_image(url="https://i.ibb.co/0Vs96g1h/sss.png")
         
@@ -566,7 +666,9 @@ async def whitelist(interaction: discord.Interaction, hrac: str, stav: app_comma
         
         response_msg = f"✔ Hráč **{target_member.display_name}** byl whitelisted"
         if not role_assigned:
-            response_msg += ", ale role se nepodařila přidat"
+            response_msg += ", ale whitelist role se nepodařila přidat"
+        if remove_role and not role_removed:
+            response_msg += f", a role {remove_role.name} se nepodařila odebrat"
         response_msg += "."
         
         await interaction.response.send_message(response_msg, ephemeral=True)
