@@ -525,9 +525,9 @@ async def update_channels():
             return
     
     weekday = datetime.datetime.now().weekday()
-    day_name = f"・📅 {CZECH_DAYS[weekday]}"
-    date_today = f"・🗓️ {datetime.datetime.now().strftime('%d-%m-%Y')}"
-    member_count = f"・👥 {guild.member_count} lidí"
+    day_name = f"📅・{CZECH_DAYS[weekday]}"
+    date_today = f"🗓️・{datetime.datetime.now().strftime('%d-%m-%Y')}"
+    member_count = f"👥・{guild.member_count} lidí"
     
     wanted_names = [day_name, date_today, member_count]
     existing = [ch for ch in category.channels if isinstance(ch, discord.VoiceChannel)]
