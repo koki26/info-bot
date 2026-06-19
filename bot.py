@@ -1157,7 +1157,7 @@ def setup_templates():
                 <small>
                     Whitelist Bot | Made by 
                     <a href="https://github.com/koki26" target="_blank" class="text-decoration-none">koki26</a>
-                    © 2025
+                    © 2025 - 2026
                 </small>
             </p>
         </div>
