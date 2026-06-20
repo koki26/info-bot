@@ -37,8 +37,8 @@ CATEGORY_NAME = "📅 Info"
 # Whitelist
 WL_ROLE_ID = 1517661951994364136     # ID role "Whitelisted"
 ADDER_ROLE_ID = 1415779903219175475   # ID role "Whitelist Adder"
-RESULTS_CHANNEL_ID = 1415779774286008451  # ID kanálu #wl-vysledky
-REMOVE_ROLE_ID = int(os.environ.get("REMOVE_ROLE_ID", 1517662000954736691))  # ID role k odebrání při udělení whitelistu
+RESULTS_CHANNEL_ID = 1517692996491939961  # ID kanálu #wl-vysledky
+REMOVE_ROLE_ID = int(os.environ.get("REMOVE_ROLE_ID", 1375176301023068181))  # ID role k odebrání při udělení whitelistu
 
 # OAuth2
 CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID")
